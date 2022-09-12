@@ -1,0 +1,86 @@
+body {
+    background-color: black;
+    font-family: 'Lato', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+div.topbar {
+    background-color: #252525;
+    width: 100%;
+    border-radius: 10px;
+    margin: 0;
+    margin-bottom: 15px;
+}
+
+p.topbar {
+    display: inline-block;
+    color: white;
+    font-size: 18px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    padding-right: 15px;
+    padding-left: 15px;
+    margin: 0;
+}
+
+p.topbar.right {
+    float: right;
+    text-align: right;
+}
+
+rainbow {
+    background-image: linear-gradient(to left, violet, rgb(137, 18, 223), rgb(0, 162, 255), green, yellow, orange, red);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.panels {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-around;
+    align-items: center;
+    margin: 0;
+    margin-top: 15px;
+    margin-bottom: 15px;
+}
+
+.panel {
+    background-image: linear-gradient(#01a0a0, rgb(0, 0, 0));
+    border-radius: 10px;
+    width: 250px;
+    height: 250px;
+    text-align: center;
+    align-items: center;
+    margin-top: 0px;
+    margin-bottom: 15px;
+}
+
+p.bPanelText {
+    color: white;
+    font-size: 24px;
+    text-align: center;
+    padding-top: 5px;
+    margin-top: 5px;
+}
+
+p.tPanelText {
+    color: white;
+    font-size: 16px;
+    text-align: center;
+    padding-top: 0px;
+    margin-top: 5px;
+}
+
+
+.panel.ssStatus {
+    background-image: linear-gradient(#ffee00cb, rgb(0, 0, 0));
+}
+
+
+.panel.blStatus {
+    background-image: linear-gradient(#c206a9, rgb(0, 0, 0));
+}
+
+button {
+    margin-top: 8px;
+}

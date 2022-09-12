@@ -1,0 +1,321 @@
+#include <ArduinoJson.h>
+
+#include <LedControl.h>
+
+#include <ESP8266WebServer.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266mDNS.h>
+#include <WiFiClient.h>
+#include <uri/UriBraces.h>
+#include <uri/UriRegex.h>
+
+#include <HttpClient.h>
+#include <b64.h>
+
+#define WIFI_SSID "SSID"
+#define WIFI_PASSWORD "Password"
+
+//       LedControl(DATA,CLOCK,CS,NUM);
+LedControl la = LedControl(D0, D2, D1, 1);
+LedControl lb = LedControl(D5, D3, D4, 1);
+LedControl lc = LedControl(D8, D6, D7, 1);
+
+ESP8266WebServer server(80);
+const String ScoreSaberPlayerAPI = "https://scoresaber.com/api/player/_ID_/full";
+const String BeatLeaderPlayerAPI = "https://api.beatleader.xyz/player/_ID_";
+DynamicJsonDocument SSAPI(512);
+DynamicJsonDocument BLAPI(2048);
+//
+// WEBSITE VARIABLES
+//
+int brightness = 8;
+String playerID = "76561198323656813";
+//
+//  SETUP
+//
+void showIP(String IP);
+void showString(LedControl display, String arr);
+void setupLED();
+void setupServer();
+void sendHtml();
+void spin(unsigned long frame, LedControl display);
+int sendRequest(String URL, DynamicJsonDocument docout);
+void showStringRight(LedControl display, String arr);
+
+void setup()
+{
+  Serial.begin(115200);
+  setupLED();
+  delay(500);
+  /* #region Setup WiFi */
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.print("Connecting to WiFi ");
+  Serial.print(WIFI_SSID);
+  // Wait for connection
+  unsigned long frames = 0;
+  while (WiFi.status() != WL_CONNECTED) {
+    spin(frames, la);
+    delay(100);
+    frames++;
+  }
+  Serial.println("Connected!");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+  showIP(WiFi.localIP().toString());
+  if (MDNS.begin("esp8266")) {
+    Serial.println("MDNS responder started");
+  }
+  /* set up the server */
+  server.on("/", sendHtml);
+  setupServer();
+  // Start server and listen for connections
+  server.begin();
+  Serial.println("HTTP server started");
+}
+
+unsigned long refreshRate = 15 * 60 * 1000;
+unsigned long refreshTime = millis() + 5 * 1000;
+void loop()
+{
+  unsigned long currTime = millis();
+  server.handleClient();
+
+if (currTime > refreshTime) {
+  if(WiFi.status() == WL_CONNECTED) {
+    delay(1000);
+    int ssrescode = sendRequest(ScoreSaberPlayerAPI, SSAPI);
+//    sendRequest(BeatLeaderPlayerAPI, BLAPI);
+    Serial.println("ScoreSaber rescode:    " + (String)ssrescode);
+  }
+
+  //serializeJson(SSAPI, Serial);
+  //serializeJson(BLAPI, Serial);
+
+  refreshTime = millis() + refreshRate;
+}
+Serial.println("currTime:    " + (String)currTime);
+Serial.println("refreshTime: " + (String)refreshTime);
+Serial.println("WifiConnect: " + (String)(WiFi.status() == WL_CONNECTED));
+Serial.println();
+delay(200);
+}
+
+#pragma region Website
+void setupServer()
+{
+  server.on(UriBraces("/update/brightness/{}"), []() {
+    brightness = server.pathArg(0).toInt();
+    setupLED();
+  });
+}
+
+void sendHtml()
+{
+  String response
+      = R"(<!doctype html><title>ESP-8266 - 60 LED Ring</title><meta name=viewport content="width=device-width,initial-scale=1"><link href="http://fonts.googleapis.com/css?family=Lato:400,700" rel=stylesheet><link href=https://github.saeraphinx.dev/ColorRing/WebFiles/style.css rel=stylesheet><link rel=icon href=https://saeraphinx.dev/images/favicon.ico type=image/x-icon><body><script src=https://github.saeraphinx.dev/ColorRing/WebFiles/script.js></script><div class=topbar><p class=topbar>ESP-8266 Web Interface -<rainbow>NeoPixel 60 LED Ring</rainbow><p class="topbar right">Local IP: _LOCAL_IP_</div><div class=panels><div class="panel brightness"><p class=brightness>Brightness<p class=brightness>_BRIGHTNESS_</p><input class=brightness id=in_bright><br><button onclick=brightness()>Update</button></div></div>
+  )";
+  response.replace("_LOCAL_IP_", WiFi.localIP().toString());
+  String br = String(brightness);
+  response.replace("_BRIGHTNESS_", br);
+  server.send(200, "text/html", response);
+}
+#pragma endregion
+
+#pragma region Animation
+void spin(unsigned long frame, LedControl display)
+{
+  int f = frame % 20;
+  int f_p = f - 17;
+  int f_inv = abs(f_p);
+  display.clearDisplay(0);
+  switch (f) {
+  case 0:
+    Serial.print(".");
+  case 1:
+  case 2:
+  case 3:
+  case 4:
+  case 5:
+  case 6:
+  case 7:
+    //                    .ABCDEFG
+    display.setRow(0, f, B01000000); 
+    break;
+  case 8:
+    display.setRow(0, 7, B00000010); 
+    break;
+  case 9:
+    display.setRow(0, 7, B00000100); 
+    break;
+  case 10:
+  case 11:
+  case 12:
+  case 13:
+  case 14:
+  case 15:
+  case 16:
+  case 17:
+    //                        .ABCDEFG
+    display.setRow(0, f_inv, B00001000);
+    break;
+  case 18:
+    display.setRow(0, 0, B00010000);
+    break;
+  case 19:
+    display.setRow(0, 0, B00100000);
+    break;
+  default:
+    break;
+  }
+}
+//           .ABCDEFG
+#define L_S B01011011
+#define L_U B00111110
+#define L_C B01001110
+void showIP(String IP)
+{
+  la.clearDisplay(0);
+  lb.clearDisplay(0);
+  la.setRow(0, 7, L_S);
+  la.setRow(0, 6, L_U);
+  la.setRow(0, 5, L_C);
+  la.setRow(0, 4, L_C);
+  la.setChar(0, 3, 'E', false);
+  la.setRow(0, 2, L_S);
+  la.setRow(0, 1, L_S);
+
+  showStringRight(lb, IP);
+}
+
+void showString(LedControl display, String arr)
+{
+  Serial.println(arr);
+  int currDigit = 7;
+  bool nextdisdp = false; 
+  for (int i = 0; i < arr.length(); i++) {
+    char t = arr.charAt(i);
+    if (t == '.') {
+      continue;
+    }
+
+    if (currDigit >= 8) {
+      return;
+    }
+
+    display.setChar(0, currDigit, t, nextdisdp);
+    nextdisdp = false;
+    if (!(i + 1 >= arr.length())) {
+      if (arr.charAt(i + 1) == '.') {
+        nextdisdp = true;
+      }
+    }
+    currDigit--;
+  }
+}
+
+void showStringRight(LedControl display, String arr)
+{
+  Serial.println(arr);
+  int currDigit = 0;
+  bool dp = false;
+  for (int i = arr.length() - 1; i >= 0; i--) {
+    char t = arr.charAt(i);
+    if (t == '.') {
+      continue;
+    }
+
+    
+    if (currDigit >= 8 || currDigit <= -1) {
+      return;
+    }
+
+    display.setChar(0, currDigit, t, dp);
+    dp = false;
+    if (!(i - 1 <= -1)) {
+      if (arr.charAt(i - 1) == '.') {
+        dp = true;
+      }
+    }
+    currDigit++;
+  }
+}
+
+void setupLED()
+{
+  // 0-16 brightness
+  int b = 3;
+  la.shutdown(0, false);
+  lb.shutdown(0, false);
+  lc.shutdown(0, false);
+  la.setIntensity(0, b);
+  lb.setIntensity(0, b);
+  lc.setIntensity(0, b);
+  la.clearDisplay(0);
+  lb.clearDisplay(0);
+  lc.clearDisplay(0);
+}
+#pragma endregion
+
+#pragma region API
+// https://arduinojson.org/v6/assistant/#
+
+// assure you have wifi before calling this
+int sendRequest(String URL, DynamicJsonDocument docout)
+{
+  WiFiClient client;
+  HttpClient http(client);
+  const int ntimeout = 15 * 1000;
+  const int ndelay = 1000;
+
+  String hn = URL.substring(0, URL.indexOf('/', 5));
+  char hostname[hn.length()];
+  hn.toCharArray(hostname, hn.length());
+  String p = URL.substring(URL.indexOf('/', 5));
+  p.replace("_ID_", playerID);
+  char path[p.length()];
+  p.toCharArray(path, p.length());
+
+  int err = http.get(hostname, path);
+  if (err > 0) {
+    err = http.responseStatusCode();
+    if (err == 200) {
+      err = http.skipResponseHeaders();
+
+      unsigned long timeoutStart = millis();
+      int bodyLen = http.contentLength();
+      char c[bodyLen];
+      unsigned long counter = 0;
+      
+      while ((http.connected() || http.available())
+          && ((millis() - timeoutStart) < ntimeout)) {
+        if (http.available()) {
+          c[counter] = http.read();
+          showStringRight(lc, (String)counter);
+          Serial.print(c[counter]);
+
+          timeoutStart = millis();
+          counter++;
+        } else {
+          delay(ndelay);
+        }
+      }
+
+      DeserializationError error = deserializeJson(docout, c, bodyLen);
+      if (error) {
+        Serial.print(F("deserializeJson() failed: "));
+        Serial.println(error.f_str());
+        return -2;
+      }
+      return 0;
+
+    } else if (err == 500) {
+      showString(lc, (String)err);
+      return -5;
+    }
+  } else {
+    return -1;
+  }
+}
+
+#pragma endregion
