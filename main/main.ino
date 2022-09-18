@@ -27,7 +27,8 @@ LedControl lc = LedControl(D8, D6, D7, 1);
 //
 ESP8266WebServer server(80);
 const String ScoreSaberPlayerAPI = "https://scoresaber.com/api/player/_ID_/full";
-const String BeatLeaderPlayerAPI = "https://api.beatleader.xyz/player/_ID_";const String TimeAPIAPI = "https://timeapi.io/api/Time/current/ip?ipAddress=_IP_";
+const String BeatLeaderPlayerAPI = "https://api.beatleader.xyz/player/_ID_";
+const String TimeAPIAPI = "https://timeapi.io/api/Time/current/ip?ipAddress=_IP_";
 DynamicJsonDocument SSAPI(2048);
 DynamicJsonDocument BLAPI(4096);
 DynamicJsonDocument TIME(512);
